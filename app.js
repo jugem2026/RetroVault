@@ -46,10 +46,21 @@ function dbSaveAll(data) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(DB_STORE, 'readwrite');
     const store = tx.objectStore(DB_STORE);
-    store.clear();
-    data.forEach(item => store.put(item));
+    const clearReq = store.clear();
+    clearReq.onsuccess = () => {
+      let saved = 0;
+      data.forEach((item, i) => {
+        // Ensure every item has an id
+        if (!item.id) item.id = Date.now().toString(36) + '_' + i;
+        try {
+          const putReq = store.put(item);
+          putReq.onsuccess = () => { saved++; };
+          putReq.onerror = (e) => { console.warn('Put failed for item:', item.title, e); };
+        } catch (e) { console.warn('Put exception for item:', item.title, e); }
+      });
+    };
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = (e) => reject(e.target.error || tx.error);
   });
 }
 
@@ -716,35 +727,48 @@ async function importData(e) {
   if (!file) return;
   document.getElementById('data-menu-panel').classList.remove('active');
   
-  const text = await file.text();
-  try {
-    const imported = JSON.parse(text);
-    if (!Array.isArray(imported)) { alert('❌ 無効なファイル形式です'); return; }
-    
-    const doImport = confirm(
-      `📥 ${imported.length}件のデータが見つかりました。\n\n` +
-      `現在のデータ（${games.length}件）をバックアップデータで置き換えます。\n` +
-      `よろしいですか？`
-    );
-    if (!doImport) return;
+  // Use FileReader for iOS Safari compatibility
+  const reader = new FileReader();
+  reader.onload = async (ev) => {
+    try {
+      const text = ev.target.result;
+      const imported = JSON.parse(text);
+      if (!Array.isArray(imported)) { alert('❌ 無効なファイル形式です'); return; }
+      
+      // Show exactly how many items are in the file
+      const doImport = confirm(
+        `📥 ファイル内のデータ: ${imported.length}件\n\n` +
+        `現在のデータ（${games.length}件）を\nバックアップデータで置き換えます。\n\n` +
+        `よろしいですか？`
+      );
+      if (!doImport) return;
 
-    // Replace all data
-    games = imported;
-    await persist();
-    
-    // Verify saved correctly
-    if (db) {
-      const saved = await dbLoadAll();
-      if (saved.length !== imported.length) {
-        alert(`⚠️ ${imported.length}件中${saved.length}件のみ保存されました。IDが重複している可能性があります。`);
+      // Ensure all items have unique IDs
+      const seenIds = new Set();
+      imported.forEach((item, i) => {
+        if (!item.id || seenIds.has(item.id)) {
+          item.id = Date.now().toString(36) + '_fix_' + i;
+        }
+        seenIds.add(item.id);
+      });
+
+      // Save to IndexedDB
+      games = imported;
+      await persist();
+      
+      // Re-read from DB to verify
+      if (db) {
+        const saved = await dbLoadAll();
         games = saved;
       }
+      
+      renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
+      alert(`✅ ${games.length}件のデータを復元しました`);
+    } catch (err) {
+      alert('❌ エラー: ' + err.message);
     }
-    
-    renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
-    alert(`✅ ${games.length}件のデータを復元しました`);
-  } catch (err) {
-    alert('❌ ファイルの読み込みに失敗しました: ' + err.message);
-  }
+  };
+  reader.onerror = () => { alert('❌ ファイルの読み込みに失敗しました'); };
+  reader.readAsText(file, 'UTF-8');
   e.target.value = '';
 }
