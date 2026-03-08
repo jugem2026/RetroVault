@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>RetroVault - レトロゲームコレクション管理</title>
+<meta name="description" content="レトロゲームのカセット・ソフトコレクションを管理するWebアプリ">
+<meta name="theme-color" content="#00ffcc">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0a1a; --surface:#141428; --surface2:#1e1e3a; --text:#e0e0ff; --text-dim:#8888aa;
+  --accent:#00ffcc; --accent2:#ff00aa; --danger:#ff4466;
+  --fc-red:#cc2222; --fc-gold:#ccaa00; --sfc-purple:#6633aa; --sfc-lavender:#aa88dd;
+  --md-black:#111; --md-blue:#2244cc; --gb-olive:#556b2f; --gb-green:#33cc33;
+  --gba-indigo:#4b0082; --gba-cyan:#00cccc; --n64-green:#006633; --n64-red:#cc0000;
+  --ps1-gray:#888; --ps1-blue:#003399; --ss-navy:#000044; --ss-white:#ccc;
+  --pce-orange:#cc6600; --neo-gold:#aa8800;
+  --radius:12px; --shadow:0 4px 24px rgba(0,0,0,.5);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh;
+  -webkit-overflow-scrolling:touch; }
+.pixel { font-family:'Press Start 2P',monospace; }
+/* HEADER */
+#app-header { background:linear-gradient(135deg,#0d0d2b,#1a0a2e); border-bottom:2px solid var(--accent);
+  padding:16px 20px; position:sticky; top:0; z-index:100; }
+#app-header h1 { font-size:clamp(14px,3vw,22px); color:var(--accent); text-shadow:0 0 12px var(--accent); }
+.header-row { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+#total-count { font-size:clamp(10px,2vw,14px); color:var(--accent2);
+  text-shadow:0 0 8px var(--accent2); }
+.btn-add { background:linear-gradient(135deg,var(--accent),#00cc99); color:#000; border:none;
+  padding:10px 20px; border-radius:var(--radius); cursor:pointer; font-weight:800;
+  font-size:14px; min-height:44px; min-width:44px; transition:transform .2s,box-shadow .2s; }
+.btn-add:hover { transform:scale(1.05); box-shadow:0 0 16px var(--accent); }
+/* SEARCH & FILTER BAR */
+#filter-bar { background:var(--surface); padding:12px 16px; position:sticky; top:70px; z-index:90;
+  border-bottom:1px solid #333; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+#filter-bar input, #filter-bar select { background:var(--surface2); color:var(--text); border:1px solid #444;
+  border-radius:8px; padding:10px 14px; font-size:14px; min-height:44px; outline:none; flex:1; min-width:120px; }
+#filter-bar input:focus, #filter-bar select:focus { border-color:var(--accent); box-shadow:0 0 8px rgba(0,255,204,.3); }
+/* GRID */
+#game-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px;
+  padding:20px; max-width:1400px; margin:0 auto; }
+.game-card { background:var(--surface); border-radius:var(--radius); overflow:hidden; cursor:pointer;
+  transition:transform .25s,box-shadow .25s; border:2px solid transparent; }
+.game-card:hover { transform:translateY(-4px); box-shadow:var(--shadow); }
+.card-img { width:100%; aspect-ratio:4/3; object-fit:cover; background:var(--surface2); display:flex;
+  align-items:center; justify-content:center; }
+.card-img img { width:100%; height:100%; object-fit:cover; }
+.card-img .no-img { font-size:48px; opacity:.3; }
+.card-body { padding:14px; }
+.card-title { font-size:13px; font-weight:800; margin-bottom:6px; line-height:1.4; }
+.card-meta { font-size:11px; color:var(--text-dim); margin-bottom:4px; }
+.card-platform { display:inline-block; padding:3px 8px; border-radius:4px; font-size:10px;
+  font-weight:700; color:#fff; margin-top:6px; }
+.card-actions { display:flex; gap:8px; padding:10px 14px; border-top:1px solid #333; }
+.card-actions button { flex:1; padding:8px; border:none; border-radius:6px; cursor:pointer;
+  font-size:12px; font-weight:700; min-height:44px; transition:opacity .2s; }
+.btn-edit { background:#335; color:var(--accent); }
+.btn-delete { background:#422; color:var(--danger); }
+/* MODAL OVERLAY */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:200;
+  overflow-y:auto; padding:20px; justify-content:center; align-items:flex-start; }
+.modal-overlay.active { display:flex; }
+.modal-box { background:var(--surface); border:1px solid #444; border-radius:var(--radius);
+  width:100%; max-width:600px; margin:auto; padding:24px; position:relative; }
+.modal-box h2 { font-size:16px; margin-bottom:16px; color:var(--accent); }
+.modal-close { position:absolute; top:12px; right:12px; background:none; border:none; color:var(--text);
+  font-size:24px; cursor:pointer; min-width:44px; min-height:44px; }
+.form-group { margin-bottom:14px; }
+.form-group label { display:block; font-size:12px; color:var(--text-dim); margin-bottom:4px; font-weight:600; }
+.form-group input, .form-group select, .form-group textarea { width:100%; background:var(--surface2);
+  color:var(--text); border:1px solid #444; border-radius:8px; padding:10px 12px; font-size:14px;
+  min-height:44px; outline:none; font-family:inherit; }
+.form-group textarea { min-height:80px; resize:vertical; }
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  border-color:var(--accent); }
+.btn-submit { width:100%; background:linear-gradient(135deg,var(--accent),#00cc99); color:#000;
+  border:none; padding:14px; border-radius:var(--radius); font-size:16px; font-weight:800;
+  cursor:pointer; min-height:48px; }
+/* SUGGEST */
+#suggest-list { background:var(--surface2); border:1px solid #555; border-radius:8px;
+  max-height:200px; overflow-y:auto; display:none; position:absolute; left:0; right:0; z-index:10; }
+#suggest-list .suggest-item { padding:10px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid #333; }
+#suggest-list .suggest-item:hover { background:var(--accent); color:#000; }
+.wiki-thumb-preview { margin-top:8px; }
+.wiki-thumb-preview img { max-width:120px; border-radius:8px; border:2px solid var(--accent); cursor:pointer; }
+.wiki-thumb-preview.selected img { box-shadow:0 0 12px var(--accent); }
+/* DETAIL MODAL */
+.detail-img { width:100%; max-height:400px; object-fit:contain; border-radius:8px; margin-bottom:16px; background:#000; }
+.detail-title { font-size:18px; font-weight:800; margin-bottom:8px; }
+.detail-meta { font-size:13px; color:var(--text-dim); margin-bottom:4px; }
+.detail-memo { margin-top:12px; font-size:13px; line-height:1.6; white-space:pre-wrap; }
+/* UPLOAD */
+.upload-area { border:2px dashed #555; border-radius:var(--radius); padding:20px; text-align:center;
+  cursor:pointer; transition:border-color .2s; min-height:80px; display:flex; align-items:center;
+  justify-content:center; flex-direction:column; gap:8px; }
+.upload-area:hover { border-color:var(--accent); }
+.upload-area img { max-width:150px; max-height:100px; border-radius:8px; }
+.upload-area input { display:none; }
+/* EMPTY STATE */
+.empty-state { grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--text-dim); }
+.empty-state .icon { font-size:64px; margin-bottom:16px; }
+/* RESPONSIVE */
+@media(max-width:767px){
+  #app-header { padding:12px 14px; }
+  #filter-bar { top:58px; padding:8px 12px; }
+  #game-grid { grid-template-columns:repeat(2,1fr); gap:12px; padding:12px; }
+  .modal-box { border-radius:0; min-height:100vh; padding:16px; margin:0; max-width:100%; }
+}
+@media(max-width:479px){
+  #game-grid { grid-template-columns:1fr; }
+  .header-row { flex-direction:column; align-items:stretch; text-align:center; }
+  .btn-add { width:100%; }
+}
+/* PLATFORM COLORS */
+.plat-fc{background:var(--fc-red);} .plat-sfc{background:var(--sfc-purple);}
+.plat-md{background:var(--md-black);border:1px solid #444;} .plat-gb{background:var(--gb-olive);}
+.plat-gba{background:var(--gba-indigo);} .plat-n64{background:var(--n64-green);}
+.plat-ps1{background:var(--ps1-blue);} .plat-ss{background:var(--ss-navy);border:1px solid #444;}
+.plat-pce{background:var(--pce-orange);} .plat-neo{background:var(--neo-gold);}
+.plat-other{background:#555;}
+.card-border-fc{border-color:var(--fc-red);} .card-border-sfc{border-color:var(--sfc-purple);}
+.card-border-md{border-color:#555;} .card-border-gb{border-color:var(--gb-olive);}
+.card-border-gba{border-color:var(--gba-indigo);} .card-border-n64{border-color:var(--n64-green);}
+.card-border-ps1{border-color:var(--ps1-blue);} .card-border-ss{border-color:var(--ss-navy);}
+.card-border-pce{border-color:var(--pce-orange);} .card-border-neo{border-color:var(--neo-gold);}
+.card-border-other{border-color:#555;}
+.loading-spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--text-dim);
+  border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; margin-left:8px; }
+@keyframes spin { to{transform:rotate(360deg)} }
+</style>
+</head>
+<body>
+<!-- HEADER -->
+<header id="app-header">
+  <div class="header-row">
+    <div>
+      <h1 class="pixel">🎮 RetroVault</h1>
+      <span id="total-count" class="pixel">所有数: 0</span>
+    </div>
+    <button class="btn-add pixel" onclick="openForm()">＋ ゲーム登録</button>
+  </div>
+</header>
+
+<!-- FILTER BAR -->
+<div id="filter-bar">
+  <input type="search" id="search-input" placeholder="🔍 タイトル検索...">
+  <select id="filter-platform"><option value="">すべての機種</option></select>
+  <select id="filter-genre"><option value="">すべてのジャンル</option></select>
+</div>
+
+<!-- GAME GRID -->
+<div id="game-grid"></div>
+
+<!-- REGISTER/EDIT MODAL -->
+<div class="modal-overlay" id="form-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeForm()">&times;</button>
+    <h2 class="pixel">ゲーム登録</h2>
+    <input type="hidden" id="edit-id">
+    <div class="form-group" style="position:relative">
+      <label>タイトル</label>
+      <input type="text" id="f-title" placeholder="ゲーム名を入力（自動検索）" autocomplete="off">
+      <div id="suggest-list"></div>
+      <span id="wiki-loading" style="display:none"><span class="loading-spinner"></span> Wikipedia検索中...</span>
+    </div>
+    <div class="form-group"><label>機種</label>
+      <select id="f-platform">
+        <option value="">選択してください</option>
+        <option value="ファミコン">ファミコン</option><option value="スーパーファミコン">スーパーファミコン</option>
+        <option value="メガドライブ">メガドライブ</option><option value="ゲームボーイ">ゲームボーイ</option>
+        <option value="ゲームボーイアドバンス">ゲームボーイアドバンス</option><option value="NINTENDO64">NINTENDO64</option>
+        <option value="PlayStation">PlayStation</option><option value="セガサターン">セガサターン</option>
+        <option value="PCエンジン">PCエンジン</option><option value="ネオジオ">ネオジオ</option>
+        <option value="その他">その他</option>
+      </select>
+    </div>
+    <div class="form-group"><label>ジャンル</label>
+      <input type="text" id="f-genre" placeholder="アクション、RPG、シューティング等"></div>
+    <div class="form-group"><label>発売年</label>
+      <input type="text" id="f-year" placeholder="1990"></div>
+    <div class="form-group"><label>メーカー</label>
+      <input type="text" id="f-maker" placeholder="開発元・発売元"></div>
+    <div class="form-group"><label>メモ</label>
+      <textarea id="f-memo" placeholder="概要やコメント"></textarea></div>
+    <div class="form-group"><label>写真</label>
+      <div class="upload-area" id="upload-area" onclick="document.getElementById('f-photo').click()">
+        <span id="upload-text">📷 タップして写真を選択</span>
+        <img id="photo-preview" style="display:none">
+        <input type="file" id="f-photo" accept="image/jpeg,image/png" capture="environment">
+      </div>
+      <div class="wiki-thumb-preview" id="wiki-thumb-area" style="display:none">
+        <label style="font-size:11px;color:var(--text-dim)">Wikipediaサムネイル（クリックで使用）:</label>
+        <img id="wiki-thumb-img" onclick="useWikiThumb()">
+      </div>
+    </div>
+    <input type="hidden" id="f-photo-data">
+    <button class="btn-submit pixel" onclick="saveGame()">💾 保存</button>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeDetail()">&times;</button>
+    <div id="detail-content"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').then(reg => {
+    console.log('SW registered:', reg.scope);
+  }).catch(err => console.warn('SW registration failed:', err));
+}
+</script>
+</body>
+</html>
