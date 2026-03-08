@@ -16,7 +16,7 @@
   --bg:#0a0a1a; --surface:#141428; --surface2:#1e1e3a; --text:#e0e0ff; --text-dim:#8888aa;
   --accent:#00ffcc; --accent2:#ff00aa; --danger:#ff4466;
   --fc-red:#cc2222; --fc-gold:#ccaa00; --sfc-purple:#6633aa; --sfc-lavender:#aa88dd;
-  --md-black:#111; --md-blue:#2244cc; --gb-olive:#556b2f; --gb-green:#33cc33;
+  --md-black:#222; --md-blue:#2244cc; --gb-olive:#556b2f; --gb-green:#33cc33;
   --gba-indigo:#4b0082; --gba-cyan:#00cccc; --n64-green:#006633; --n64-red:#cc0000;
   --ps1-gray:#888; --ps1-blue:#003399; --ss-navy:#000044; --ss-white:#ccc;
   --pce-orange:#cc6600; --neo-gold:#aa8800;
@@ -26,50 +26,162 @@
 body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh;
   -webkit-overflow-scrolling:touch; }
 .pixel { font-family:'Press Start 2P',monospace; }
-/* HEADER */
-#app-header { background:linear-gradient(135deg,#0d0d2b,#1a0a2e); border-bottom:2px solid var(--accent);
-  padding:16px 20px; position:sticky; top:0; z-index:100; }
-#app-header h1 { font-size:clamp(14px,3vw,22px); color:var(--accent); text-shadow:0 0 12px var(--accent); }
+
+/* ===== HEADER ===== */
+#app-header {
+  background:linear-gradient(135deg,#0d0d2b,#1a0a2e);
+  border-bottom:2px solid var(--accent);
+  padding:14px 20px;
+  position:sticky; top:0; z-index:100;
+}
+#app-header h1 { font-size:clamp(14px,3vw,20px); color:var(--accent); text-shadow:0 0 12px var(--accent); }
 .header-row { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
-#total-count { font-size:clamp(10px,2vw,14px); color:var(--accent2);
-  text-shadow:0 0 8px var(--accent2); }
+.header-right { display:flex; align-items:center; gap:12px; }
+#total-count { font-size:clamp(9px,1.8vw,13px); color:var(--accent2);
+  text-shadow:0 0 8px var(--accent2); white-space:nowrap; }
 .btn-add { background:linear-gradient(135deg,var(--accent),#00cc99); color:#000; border:none;
-  padding:10px 20px; border-radius:var(--radius); cursor:pointer; font-weight:800;
-  font-size:14px; min-height:44px; min-width:44px; transition:transform .2s,box-shadow .2s; }
+  padding:10px 18px; border-radius:var(--radius); cursor:pointer; font-weight:800;
+  font-size:13px; min-height:44px; min-width:44px; transition:transform .2s,box-shadow .2s; white-space:nowrap; }
 .btn-add:hover { transform:scale(1.05); box-shadow:0 0 16px var(--accent); }
-/* SEARCH & FILTER BAR */
-#filter-bar { background:var(--surface); padding:12px 16px; position:sticky; top:70px; z-index:90;
-  border-bottom:1px solid #333; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-#filter-bar input, #filter-bar select { background:var(--surface2); color:var(--text); border:1px solid #444;
-  border-radius:8px; padding:10px 14px; font-size:14px; min-height:44px; outline:none; flex:1; min-width:120px; }
-#filter-bar input:focus, #filter-bar select:focus { border-color:var(--accent); box-shadow:0 0 8px rgba(0,255,204,.3); }
-/* GRID */
-#game-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:20px;
-  padding:20px; max-width:1400px; margin:0 auto; }
-.game-card { background:var(--surface); border-radius:var(--radius); overflow:hidden; cursor:pointer;
-  transition:transform .25s,box-shadow .25s; border:2px solid transparent; }
-.game-card:hover { transform:translateY(-4px); box-shadow:var(--shadow); }
-.card-img { width:100%; aspect-ratio:4/3; object-fit:cover; background:var(--surface2); display:flex;
-  align-items:center; justify-content:center; }
-.card-img img { width:100%; height:100%; object-fit:cover; }
-.card-img .no-img { font-size:48px; opacity:.3; }
-.card-body { padding:14px; }
-.card-title { font-size:13px; font-weight:800; margin-bottom:6px; line-height:1.4; }
-.card-meta { font-size:11px; color:var(--text-dim); margin-bottom:4px; }
-.card-platform { display:inline-block; padding:3px 8px; border-radius:4px; font-size:10px;
-  font-weight:700; color:#fff; margin-top:6px; }
-.card-actions { display:flex; gap:8px; padding:10px 14px; border-top:1px solid #333; }
-.card-actions button { flex:1; padding:8px; border:none; border-radius:6px; cursor:pointer;
-  font-size:12px; font-weight:700; min-height:44px; transition:opacity .2s; }
-.btn-edit { background:#335; color:var(--accent); }
-.btn-delete { background:#422; color:var(--danger); }
-/* MODAL OVERLAY */
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:200;
+
+/* ===== SEARCH BAR (所持確認サーチ) ===== */
+#ownership-search {
+  background:var(--surface);
+  padding:10px 16px;
+  position:sticky; top:60px; z-index:95;
+  border-bottom:1px solid #333;
+}
+#ownership-search-input {
+  width:100%; background:var(--surface2); color:var(--text); border:1px solid #444;
+  border-radius:8px; padding:10px 14px 10px 38px; font-size:14px; min-height:44px; outline:none;
+}
+#ownership-search-input:focus { border-color:var(--accent); box-shadow:0 0 8px rgba(0,255,204,.3); }
+.search-wrapper { position:relative; }
+.search-wrapper::before {
+  content:'🔍'; position:absolute; left:12px; top:50%; transform:translateY(-50%);
+  font-size:14px; pointer-events:none;
+}
+#ownership-result {
+  margin-top:8px; font-size:13px; font-weight:700; min-height:22px;
+  transition:opacity .2s;
+}
+.result-found { color:#44dd88; }
+.result-not-found { color:#ff5577; }
+
+/* ===== PLATFORM TABS ===== */
+#platform-tabs {
+  background:var(--surface);
+  padding:10px 16px 8px;
+  position:sticky; top:115px; z-index:90;
+  border-bottom:1px solid #333;
+  overflow-x:auto; -webkit-overflow-scrolling:touch;
+  display:flex; gap:6px;
+  scrollbar-width:none;
+}
+#platform-tabs::-webkit-scrollbar { display:none; }
+.platform-tab {
+  flex-shrink:0; padding:8px 16px; border-radius:20px;
+  border:1.5px solid #444; background:transparent; color:var(--text-dim);
+  font-size:12px; font-weight:700; cursor:pointer;
+  transition:all .25s; white-space:nowrap; min-height:36px;
+}
+.platform-tab:hover { border-color:var(--accent); color:var(--text); }
+.platform-tab.active {
+  background:var(--accent); color:#000; border-color:var(--accent);
+  box-shadow:0 0 12px rgba(0,255,204,.3);
+}
+.platform-tab .tab-count {
+  display:inline-block; margin-left:4px; font-size:10px; opacity:.7;
+}
+
+/* ===== GAME LIST ===== */
+#game-list {
+  max-width:800px; margin:0 auto; padding:8px 16px 100px;
+}
+.list-item {
+  display:flex; align-items:center; gap:12px;
+  padding:14px 16px; margin-bottom:2px;
+  background:var(--surface); border-radius:8px;
+  cursor:pointer; transition:background .2s, transform .15s;
+  position:relative; overflow:hidden;
+}
+.list-item:hover { background:var(--surface2); transform:translateX(4px); }
+.list-item:active { transform:scale(0.98); }
+.list-color-bar {
+  position:absolute; left:0; top:0; bottom:0; width:4px;
+}
+.list-title {
+  font-size:14px; font-weight:600; flex:1; padding-left:8px;
+  line-height:1.4;
+}
+.list-platform-badge {
+  font-size:9px; font-weight:700; padding:3px 8px; border-radius:4px;
+  color:#fff; white-space:nowrap; flex-shrink:0;
+}
+
+/* Empty state */
+.empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
+.empty-state .icon { font-size:64px; margin-bottom:16px; }
+
+/* ===== DETAIL SHEET (Slide-up) ===== */
+.sheet-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:200;
+  opacity:0; transition:opacity .3s;
+}
+.sheet-overlay.active { display:block; opacity:1; }
+.detail-sheet {
+  position:fixed; bottom:0; left:0; right:0; z-index:210;
+  background:var(--surface); border-radius:20px 20px 0 0;
+  max-height:85vh; overflow-y:auto;
+  transform:translateY(100%); transition:transform .35s cubic-bezier(.32,.72,.24,1.02);
+  padding:0 0 env(safe-area-inset-bottom, 20px);
+}
+.detail-sheet.active { transform:translateY(0); }
+.sheet-handle {
+  width:40px; height:4px; background:#555; border-radius:2px;
+  margin:10px auto 0; cursor:grab;
+}
+.sheet-content { padding:16px 20px 24px; }
+.detail-img {
+  width:100%; max-height:320px; object-fit:contain; border-radius:12px;
+  margin-bottom:16px; background:#000;
+}
+.detail-title { font-size:18px; font-weight:800; margin-bottom:8px; line-height:1.4; }
+.detail-platform-badge {
+  display:inline-block; padding:4px 12px; border-radius:6px;
+  font-size:11px; font-weight:700; color:#fff; margin-bottom:12px;
+}
+.detail-info { margin-bottom:16px; }
+.detail-info-row {
+  display:flex; gap:8px; padding:8px 0; border-bottom:1px solid #2a2a4a;
+  font-size:13px;
+}
+.detail-info-label { color:var(--text-dim); min-width:70px; flex-shrink:0; }
+.detail-info-value { color:var(--text); }
+.detail-memo {
+  margin-top:12px; padding:14px; background:var(--surface2); border-radius:10px;
+  font-size:13px; line-height:1.7; white-space:pre-wrap; color:var(--text-dim);
+}
+.detail-memo-title { font-size:11px; color:var(--text-dim); margin-bottom:6px; font-weight:600; }
+.detail-actions {
+  display:flex; gap:10px; margin-top:20px;
+}
+.detail-actions button {
+  flex:1; padding:12px; border:none; border-radius:10px; cursor:pointer;
+  font-size:13px; font-weight:700; min-height:48px; transition:opacity .2s;
+}
+.btn-edit-detail { background:#1a2a4a; color:var(--accent); }
+.btn-edit-detail:hover { background:#243558; }
+.btn-delete-detail { background:#2a1520; color:var(--danger); }
+.btn-delete-detail:hover { background:#3a1a28; }
+
+/* ===== MODAL OVERLAY (register/edit form) ===== */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:300;
   overflow-y:auto; padding:20px; justify-content:center; align-items:flex-start; }
 .modal-overlay.active { display:flex; }
 .modal-box { background:var(--surface); border:1px solid #444; border-radius:var(--radius);
   width:100%; max-width:600px; margin:auto; padding:24px; position:relative; }
-.modal-box h2 { font-size:16px; margin-bottom:16px; color:var(--accent); }
+.modal-box h2 { font-size:14px; margin-bottom:16px; color:var(--accent); }
 .modal-close { position:absolute; top:12px; right:12px; background:none; border:none; color:var(--text);
   font-size:24px; cursor:pointer; min-width:44px; min-height:44px; }
 .form-group { margin-bottom:14px; }
@@ -91,11 +203,6 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .wiki-thumb-preview { margin-top:8px; }
 .wiki-thumb-preview img { max-width:120px; border-radius:8px; border:2px solid var(--accent); cursor:pointer; }
 .wiki-thumb-preview.selected img { box-shadow:0 0 12px var(--accent); }
-/* DETAIL MODAL */
-.detail-img { width:100%; max-height:400px; object-fit:contain; border-radius:8px; margin-bottom:16px; background:#000; }
-.detail-title { font-size:18px; font-weight:800; margin-bottom:8px; }
-.detail-meta { font-size:13px; color:var(--text-dim); margin-bottom:4px; }
-.detail-memo { margin-top:12px; font-size:13px; line-height:1.6; white-space:pre-wrap; }
 /* UPLOAD */
 .upload-area { border:2px dashed #555; border-radius:var(--radius); padding:20px; text-align:center;
   cursor:pointer; transition:border-color .2s; min-height:80px; display:flex; align-items:center;
@@ -103,37 +210,40 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 .upload-area:hover { border-color:var(--accent); }
 .upload-area img { max-width:150px; max-height:100px; border-radius:8px; }
 .upload-area input { display:none; }
-/* EMPTY STATE */
-.empty-state { grid-column:1/-1; text-align:center; padding:60px 20px; color:var(--text-dim); }
-.empty-state .icon { font-size:64px; margin-bottom:16px; }
-/* RESPONSIVE */
-@media(max-width:767px){
-  #app-header { padding:12px 14px; }
-  #filter-bar { top:58px; padding:8px 12px; }
-  #game-grid { grid-template-columns:repeat(2,1fr); gap:12px; padding:12px; }
-  .modal-box { border-radius:0; min-height:100vh; padding:16px; margin:0; max-width:100%; }
-}
-@media(max-width:479px){
-  #game-grid { grid-template-columns:1fr; }
-  .header-row { flex-direction:column; align-items:stretch; text-align:center; }
-  .btn-add { width:100%; }
-}
-/* PLATFORM COLORS */
-.plat-fc{background:var(--fc-red);} .plat-sfc{background:var(--sfc-purple);}
-.plat-md{background:var(--md-black);border:1px solid #444;} .plat-gb{background:var(--gb-olive);}
-.plat-gba{background:var(--gba-indigo);} .plat-n64{background:var(--n64-green);}
-.plat-ps1{background:var(--ps1-blue);} .plat-ss{background:var(--ss-navy);border:1px solid #444;}
-.plat-pce{background:var(--pce-orange);} .plat-neo{background:var(--neo-gold);}
-.plat-other{background:#555;}
-.card-border-fc{border-color:var(--fc-red);} .card-border-sfc{border-color:var(--sfc-purple);}
-.card-border-md{border-color:#555;} .card-border-gb{border-color:var(--gb-olive);}
-.card-border-gba{border-color:var(--gba-indigo);} .card-border-n64{border-color:var(--n64-green);}
-.card-border-ps1{border-color:var(--ps1-blue);} .card-border-ss{border-color:var(--ss-navy);}
-.card-border-pce{border-color:var(--pce-orange);} .card-border-neo{border-color:var(--neo-gold);}
-.card-border-other{border-color:#555;}
 .loading-spinner { display:inline-block; width:16px; height:16px; border:2px solid var(--text-dim);
   border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; margin-left:8px; }
 @keyframes spin { to{transform:rotate(360deg)} }
+
+/* PLATFORM COLORS */
+.plat-fc{background:var(--fc-red);} .plat-sfc{background:var(--sfc-purple);}
+.plat-md{background:var(--md-black);border:1px solid #555;} .plat-gb{background:var(--gb-olive);}
+.plat-gba{background:var(--gba-indigo);} .plat-n64{background:var(--n64-green);}
+.plat-ps1{background:var(--ps1-blue);} .plat-ss{background:var(--ss-navy);border:1px solid #555;}
+.plat-pce{background:var(--pce-orange);} .plat-neo{background:var(--neo-gold);}
+.plat-other{background:#555;}
+
+.bar-fc{background:var(--fc-red);} .bar-sfc{background:var(--sfc-purple);}
+.bar-md{background:var(--md-black);} .bar-gb{background:var(--gb-olive);}
+.bar-gba{background:var(--gba-indigo);} .bar-n64{background:var(--n64-green);}
+.bar-ps1{background:var(--ps1-blue);} .bar-ss{background:var(--ss-navy);}
+.bar-pce{background:var(--pce-orange);} .bar-neo{background:var(--neo-gold);}
+.bar-other{background:#555;}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:767px){
+  #app-header { padding:10px 14px; }
+  #ownership-search { top:52px; padding:8px 12px; }
+  #platform-tabs { top:107px; padding:8px 12px 6px; }
+  .list-item { padding:12px 14px; }
+  .detail-sheet { max-height:90vh; }
+  .modal-box { border-radius:0; min-height:100vh; padding:16px; margin:0; max-width:100%; }
+}
+@media(max-width:479px){
+  .header-row { flex-direction:row; }
+  .btn-add { padding:8px 14px; font-size:12px; }
+  #total-count { font-size:9px; }
+  .list-title { font-size:13px; }
+}
 </style>
 </head>
 <body>
@@ -142,21 +252,34 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
   <div class="header-row">
     <div>
       <h1 class="pixel">🎮 RetroVault</h1>
-      <span id="total-count" class="pixel">所有数: 0</span>
     </div>
-    <button class="btn-add pixel" onclick="openForm()">＋ ゲーム登録</button>
+    <div class="header-right">
+      <span id="total-count" class="pixel">所有数: 0</span>
+      <button class="btn-add pixel" onclick="openForm()">＋ 登録</button>
+    </div>
   </div>
 </header>
 
-<!-- FILTER BAR -->
-<div id="filter-bar">
-  <input type="search" id="search-input" placeholder="🔍 タイトル検索...">
-  <select id="filter-platform"><option value="">すべての機種</option></select>
-  <select id="filter-genre"><option value="">すべてのジャンル</option></select>
+<!-- OWNERSHIP SEARCH -->
+<div id="ownership-search">
+  <div class="search-wrapper">
+    <input type="search" id="ownership-search-input" placeholder="所持確認サーチ...タイトルを入力">
+  </div>
+  <div id="ownership-result"></div>
 </div>
 
-<!-- GAME GRID -->
-<div id="game-grid"></div>
+<!-- PLATFORM TABS -->
+<div id="platform-tabs"></div>
+
+<!-- GAME LIST -->
+<div id="game-list"></div>
+
+<!-- DETAIL SHEET -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeDetail()"></div>
+<div class="detail-sheet" id="detail-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-content" id="detail-content"></div>
+</div>
 
 <!-- REGISTER/EDIT MODAL -->
 <div class="modal-overlay" id="form-modal">
@@ -202,14 +325,6 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
     </div>
     <input type="hidden" id="f-photo-data">
     <button class="btn-submit pixel" onclick="saveGame()">💾 保存</button>
-  </div>
-</div>
-
-<!-- DETAIL MODAL -->
-<div class="modal-overlay" id="detail-modal">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closeDetail()">&times;</button>
-    <div id="detail-content"></div>
   </div>
 </div>
 
