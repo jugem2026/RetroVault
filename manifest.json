@@ -4,8 +4,8 @@
   "description": "レトロゲームのカセット・ソフトコレクションを管理するWebアプリ",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#0a0a1a",
-  "theme_color": "#00ffcc",
+  "background_color": "#f0f4f8",
+  "theme_color": "#ffb6c1",
   "orientation": "portrait-primary",
   "icons": [
     {
