@@ -383,33 +383,52 @@ async function wikiSearch(query) {
   const loading = document.getElementById('wiki-loading');
   loading.style.display = 'inline';
   try {
-    // Search with "ゲーム" appended to bias results toward games
-    let results = await fetchSuggest('ja', query + ' ゲーム');
-    // If no results with ゲーム suffix, try without
-    if (results.length === 0) results = await fetchSuggest('ja', query);
-    if (results.length === 0) results = await fetchSuggest('en', query + ' game');
+    let results = await fetchSuggest('ja', query);
     if (results.length === 0) results = await fetchSuggest('en', query);
     if (results.length === 0) { sl.style.display = 'none'; return; }
+
+    // Sort: game-related results first
+    results.sort((a, b) => (b.isGame ? 1 : 0) - (a.isGame ? 1 : 0));
+
     sl.innerHTML = results.map(r => {
+      const badge = r.isGame ? '<span style="color:#e85d5d;font-size:10px;margin-left:4px">🎮</span>' : '';
       const desc = r.snippet ? `<span style="font-size:10px;color:var(--text-dim);display:block;margin-top:2px">${r.snippet}</span>` : '';
-      return `<div class="suggest-item" onclick="selectSuggest('${escAttr(r.title)}','${r.lang}')">${esc(r.title)}${desc}</div>`;
+      return `<div class="suggest-item" onclick="selectSuggest('${escAttr(r.title)}','${r.lang}')">${esc(r.title)}${badge}${desc}</div>`;
     }).join('');
     sl.style.display = 'block';
   } catch (err) { console.error('Wiki search error:', err); }
   finally { loading.style.display = 'none'; }
 }
 
+// Game-related category keywords
+const GAME_CAT_KEYWORDS = [
+  'ゲーム', 'ソフト', 'コンピュータ', 'ファミコン', 'ファミリーコンピュータ',
+  'スーパーファミコン', 'メガドライブ', 'ゲームボーイ', 'プレイステーション',
+  'セガサターン', 'nintendo', 'playstation', 'sega', 'game', 'video game',
+  'ネオジオ', 'pcエンジン', 'アーケード', 'コンソール'
+];
+
 async function fetchSuggest(lang, query) {
-  // Use action=query&list=search for better results with snippets
-  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=8&srnamespace=0&format=json&origin=*`;
+  // Use generator=search with prop=categories to get results + their categories in one call
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(query)}&gsrlimit=10&gsrnamespace=0&prop=categories&clshow=!hidden&cllimit=20&format=json&origin=*`;
   const res = await fetch(url);
   const data = await res.json();
-  if (!data.query || !data.query.search || data.query.search.length === 0) return [];
-  return data.query.search.map(item => ({
-    title: item.title,
-    lang,
-    snippet: item.snippet ? item.snippet.replace(/<[^>]+>/g, '').slice(0, 60) : ''
-  }));
+  if (!data.query || !data.query.pages) return [];
+
+  const pages = Object.values(data.query.pages);
+  // Sort by search index
+  pages.sort((a, b) => (a.index || 0) - (b.index || 0));
+
+  return pages.map(page => {
+    const cats = (page.categories || []).map(c => c.title.toLowerCase());
+    const isGame = cats.some(cat => GAME_CAT_KEYWORDS.some(kw => cat.includes(kw)));
+    // Build a short snippet from category names
+    const gameCat = (page.categories || []).find(c =>
+      GAME_CAT_KEYWORDS.some(kw => c.title.toLowerCase().includes(kw))
+    );
+    const snippet = gameCat ? gameCat.title.replace('Category:', '').replace('カテゴリ:', '') : '';
+    return { title: page.title, lang, isGame, snippet };
+  }).slice(0, 8);
 }
 
 async function selectSuggest(title, lang) {
