@@ -667,13 +667,14 @@ async function useWikiThumb() {
 // ===== UTILS =====
 function persist() {
   if (db) {
-    dbSaveAll(games).catch(e => {
+    return dbSaveAll(games).catch(e => {
       console.error('IndexedDB save error:', e);
       alert('保存に失敗しました: ' + e.message);
     });
   } else {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(games)); }
     catch (e) { alert('保存容量を超えました。写真のサイズを小さくするか、不要なデータを削除してください。'); }
+    return Promise.resolve();
   }
 }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -710,36 +711,40 @@ function exportData() {
   alert(`✅ ${games.length}件のデータをエクスポートしました`);
 }
 
-function importData(e) {
+async function importData(e) {
   const file = e.target.files[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const imported = JSON.parse(ev.target.result);
-      if (!Array.isArray(imported)) { alert('❌ 無効なファイル形式です'); return; }
-      const mode = confirm(
-        `📥 ${imported.length}件のデータが見つかりました。\n\n` +
-        `「OK」→ 既存データに追加（マージ）\n` +
-        `「キャンセル」→ 既存データを置き換え`
-      );
-      if (mode) {
-        // Merge: add only games with IDs not already in the list
-        const existingIds = new Set(games.map(g => g.id));
-        const newGames = imported.filter(g => !existingIds.has(g.id));
-        games = [...games, ...newGames];
-        alert(`✅ ${newGames.length}件の新しいデータを追加しました（重複 ${imported.length - newGames.length}件はスキップ）`);
-      } else {
-        games = imported;
-        alert(`✅ ${imported.length}件のデータで置き換えました`);
-      }
-      persist();
-      renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
-    } catch (err) {
-      alert('❌ ファイルの読み込みに失敗しました: ' + err.message);
-    }
-  };
-  reader.readAsText(file);
-  e.target.value = ''; // reset so same file can be re-selected
   document.getElementById('data-menu-panel').classList.remove('active');
+  
+  const text = await file.text();
+  try {
+    const imported = JSON.parse(text);
+    if (!Array.isArray(imported)) { alert('❌ 無効なファイル形式です'); return; }
+    
+    const doImport = confirm(
+      `📥 ${imported.length}件のデータが見つかりました。\n\n` +
+      `現在のデータ（${games.length}件）をバックアップデータで置き換えます。\n` +
+      `よろしいですか？`
+    );
+    if (!doImport) return;
+
+    // Replace all data
+    games = imported;
+    await persist();
+    
+    // Verify saved correctly
+    if (db) {
+      const saved = await dbLoadAll();
+      if (saved.length !== imported.length) {
+        alert(`⚠️ ${imported.length}件中${saved.length}件のみ保存されました。IDが重複している可能性があります。`);
+        games = saved;
+      }
+    }
+    
+    renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
+    alert(`✅ ${games.length}件のデータを復元しました`);
+  } catch (err) {
+    alert('❌ ファイルの読み込みに失敗しました: ' + err.message);
+  }
+  e.target.value = '';
 }
