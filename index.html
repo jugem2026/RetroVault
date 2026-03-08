@@ -170,7 +170,7 @@ body {
 .sort-btn:hover { border-color:var(--accent); color:var(--text); }
 .sort-btn.active { background:var(--lavender-soft); color:var(--text); border-color:#c4a8e0; }
 .sort-btn .sort-arrow { font-size:10px; }
-#maker-filter {
+#maker-filter, #genre-filter {
   padding:6px 12px; border-radius:20px;
   border:2px solid #e8e0ee; background:#fff; color:var(--text);
   font-size:11px; font-weight:700; min-height:32px;
@@ -402,6 +402,9 @@ body::before {
   <button class="sort-btn" id="sort-year" onclick="setSort('year')">発売年順 <span class="sort-arrow">▲</span></button>
   <select id="maker-filter" onchange="renderList()">
     <option value="">すべてのメーカー</option>
+  </select>
+  <select id="genre-filter" onchange="renderList()">
+    <option value="">すべてのジャンル</option>
   </select>
 </div>
 

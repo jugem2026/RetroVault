@@ -17,6 +17,7 @@ let sortAsc = true; // true = ascending, false = descending
 document.addEventListener('DOMContentLoaded', () => {
   renderTabs();
   populateMakers();
+  populateGenres();
   renderList();
   updateCount();
   // Ownership search
@@ -80,6 +81,17 @@ function populateMakers() {
   sel.value = current;
 }
 
+function populateGenres() {
+  const genreSet = new Set(games.map(g => g.genre).filter(Boolean));
+  const sel = document.getElementById('genre-filter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">すべてのジャンル</option>' +
+    [...genreSet].sort((a, b) => a.localeCompare(b, 'ja')).map(g =>
+      `<option value="${esc(g)}">${esc(g)}</option>`
+    ).join('');
+  sel.value = current;
+}
+
 // ===== PLATFORM TABS =====
 function renderTabs() {
   const container = document.getElementById('platform-tabs');
@@ -138,6 +150,11 @@ function renderList() {
   const makerVal = document.getElementById('maker-filter').value;
   if (makerVal) {
     filtered = filtered.filter(g => g.maker === makerVal);
+  }
+  // Genre filter
+  const genreVal = document.getElementById('genre-filter').value;
+  if (genreVal) {
+    filtered = filtered.filter(g => g.genre === genreVal);
   }
   const sorted = sortGames(filtered);
   const container = document.getElementById('game-list');
@@ -232,7 +249,7 @@ function closeDetail() {
 function deleteGameFromDetail(id) {
   if (!confirm('このゲームを削除しますか？')) return;
   games = games.filter(g => g.id !== id);
-  persist(); closeDetail(); renderTabs(); populateMakers(); renderList(); updateCount();
+  persist(); closeDetail(); renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
 }
 
 // Swipe-down to close
@@ -302,7 +319,7 @@ function saveGame() {
   };
   if (editId) { const idx = games.findIndex(g => g.id === editId); if (idx >= 0) games[idx] = data; }
   else games.unshift(data);
-  persist(); closeForm(); renderTabs(); populateMakers(); renderList(); updateCount();
+  persist(); closeForm(); renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
 }
 
 function editGame(id) {
@@ -326,7 +343,7 @@ function editGame(id) {
 function deleteGame(id) {
   if (!confirm('このゲームを削除しますか？')) return;
   games = games.filter(g => g.id !== id);
-  persist(); renderTabs(); populateMakers(); renderList(); updateCount();
+  persist(); renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
 }
 
 // ===== PHOTO =====
@@ -366,21 +383,33 @@ async function wikiSearch(query) {
   const loading = document.getElementById('wiki-loading');
   loading.style.display = 'inline';
   try {
-    let results = await fetchSuggest('ja', query);
+    // Search with "ゲーム" appended to bias results toward games
+    let results = await fetchSuggest('ja', query + ' ゲーム');
+    // If no results with ゲーム suffix, try without
+    if (results.length === 0) results = await fetchSuggest('ja', query);
+    if (results.length === 0) results = await fetchSuggest('en', query + ' game');
     if (results.length === 0) results = await fetchSuggest('en', query);
     if (results.length === 0) { sl.style.display = 'none'; return; }
-    sl.innerHTML = results.map(r => `<div class="suggest-item" onclick="selectSuggest('${escAttr(r.title)}','${r.lang}')">${esc(r.title)}</div>`).join('');
+    sl.innerHTML = results.map(r => {
+      const desc = r.snippet ? `<span style="font-size:10px;color:var(--text-dim);display:block;margin-top:2px">${r.snippet}</span>` : '';
+      return `<div class="suggest-item" onclick="selectSuggest('${escAttr(r.title)}','${r.lang}')">${esc(r.title)}${desc}</div>`;
+    }).join('');
     sl.style.display = 'block';
   } catch (err) { console.error('Wiki search error:', err); }
   finally { loading.style.display = 'none'; }
 }
 
 async function fetchSuggest(lang, query) {
-  const url = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=8&format=json&origin=*`;
+  // Use action=query&list=search for better results with snippets
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srlimit=8&srnamespace=0&format=json&origin=*`;
   const res = await fetch(url);
   const data = await res.json();
-  if (!data[1] || data[1].length === 0) return [];
-  return data[1].map(title => ({ title, lang }));
+  if (!data.query || !data.query.search || data.query.search.length === 0) return [];
+  return data.query.search.map(item => ({
+    title: item.title,
+    lang,
+    snippet: item.snippet ? item.snippet.replace(/<[^>]+>/g, '').slice(0, 60) : ''
+  }));
 }
 
 async function selectSuggest(title, lang) {
@@ -394,16 +423,20 @@ async function selectSuggest(title, lang) {
 }
 
 async function fetchWikiDetails(title, lang) {
-  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro&explaintext&piprop=thumbnail&pithumbsize=400&titles=${encodeURIComponent(title)}&format=json&origin=*`;
+  // Use redirects=1 to follow redirects (important for popular games)
+  const url = `https://${lang}.wikipedia.org/w/api.php?action=query&prop=extracts|pageimages&exintro&explaintext&piprop=thumbnail&pithumbsize=400&redirects=1&titles=${encodeURIComponent(title)}&format=json&origin=*`;
   const res = await fetch(url);
   const data = await res.json();
   const pages = data.query.pages;
   const page = Object.values(pages)[0];
   if (!page || page.missing) return;
 
+  const resolvedTitle = page.title || title;
   const extract = page.extract || '';
   const summary = extract.slice(0, 300);
   document.getElementById('f-memo').value = summary;
+
+  // Try to extract info from the text as a fallback
   parseExtractInfo(extract, lang);
 
   if (page.thumbnail && page.thumbnail.source) {
@@ -412,30 +445,37 @@ async function fetchWikiDetails(title, lang) {
     document.getElementById('wiki-thumb-img').src = wikiThumbUrl;
     area.style.display = 'block';
   }
-  await fetchInfobox(title, lang);
+
+  // Fetch infobox using the resolved title (after redirects)
+  await fetchInfobox(resolvedTitle, lang);
 }
 
 async function fetchInfobox(title, lang) {
   try {
-    const url = `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=wikitext&section=0&format=json&origin=*`;
+    const url = `https://${lang}.wikipedia.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=wikitext&section=0&redirects=1&format=json&origin=*`;
     const res = await fetch(url);
     const data = await res.json();
     if (!data.parse || !data.parse.wikitext) return;
     const wt = data.parse.wikitext['*'] || '';
 
+    // Improved field extraction: capture value until next "|field=" or "}}"
     const getField = (...names) => {
       for (const n of names) {
-        const re = new RegExp(`\\|\\s*${n}\\s*=\\s*(.+?)(?:\\n|$)`, 'i');
+        // Match |fieldname = value (can span multiple lines, until next | or }})
+        const re = new RegExp(`\\|\\s*${n}\\s*=\\s*([\\s\\S]*?)(?=\\n\\s*\\||\\}\\})`, 'i');
         const m = wt.match(re);
-        if (m) return cleanWikiText(m[1].trim());
+        if (m) {
+          const val = cleanWikiText(m[1].trim());
+          if (val) return val;
+        }
       }
       return '';
     };
 
     const platform = getField('対応機種', '機種', 'plat', 'platform', 'platforms');
     const genre = getField('ジャンル', 'genre', 'genres');
-    const year = getField('発売日', '発売年', 'date', 'released', 'release', 'release date');
-    const maker = getField('開発元', '発売元', 'dev', 'developer', 'publisher', 'pub', '販売元');
+    const year = getField('発売日', '発売年', 'date', 'released', 'release', 'release date', '発売元.*?年');
+    const maker = getField('開発元', '発売元', 'dev', 'developer', 'publisher', 'pub', '販売元', '開発・発売元');
 
     if (platform && !document.getElementById('f-platform').value) {
       const matched = matchPlatform(platform);
@@ -451,9 +491,36 @@ async function fetchInfobox(title, lang) {
 }
 
 function parseExtractInfo(text, lang) {
+  // Extract year from text
   const yearMatch = text.match(/((?:19|20)\d{2})年/);
   if (yearMatch && !document.getElementById('f-year').value) {
     document.getElementById('f-year').value = yearMatch[1];
+  }
+  // Try to extract genre from common patterns in Japanese text
+  const genrePatterns = [
+    /ジャンルは(.+?)(?:。|、|の)/,
+    /(.+?)ゲーム(?:である|です|。)/,
+  ];
+  for (const p of genrePatterns) {
+    const gm = text.match(p);
+    if (gm && !document.getElementById('f-genre').value) {
+      const genre = gm[1].trim();
+      if (genre.length < 20) document.getElementById('f-genre').value = genre;
+      break;
+    }
+  }
+  // Try to extract maker from text
+  const makerPatterns = [
+    /(?:が|は)(.+?)(?:が開発|より発売|から発売|が発売)/,
+    /開発元[はが](.+?)(?:。|、|で)/,
+  ];
+  for (const p of makerPatterns) {
+    const mm = text.match(p);
+    if (mm && !document.getElementById('f-maker').value) {
+      const maker = mm[1].trim();
+      if (maker.length < 30) document.getElementById('f-maker').value = maker;
+      break;
+    }
   }
 }
 
