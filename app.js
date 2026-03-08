@@ -1,20 +1,80 @@
 // ===== RetroVault - レトロゲームコレクション管理 =====
 const STORAGE_KEY = 'retrovault_games';
+const DB_NAME = 'RetroVaultDB';
+const DB_STORE = 'games';
+const DB_VERSION = 1;
 const PLATFORMS = {
   'ファミコン':'fc','スーパーファミコン':'sfc','メガドライブ':'md','ゲームボーイ':'gb',
   'ゲームボーイアドバンス':'gba','NINTENDO64':'n64','PlayStation':'ps1','セガサターン':'ss',
   'PCエンジン':'pce','ネオジオ':'neo','その他':'other'
 };
 
-let games = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+let games = [];
+let db = null;
 let wikiThumbUrl = '';
 let suggestTimer = null;
 let activePlatform = ''; // '' = すべて
 let currentSort = 'title'; // 'title' or 'year'
 let sortAsc = true; // true = ascending, false = descending
 
+// ===== IndexedDB =====
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(DB_STORE)) {
+        d.createObjectStore(DB_STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+function dbLoadAll() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readonly');
+    const store = tx.objectStore(DB_STORE);
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbSaveAll(data) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    const store = tx.objectStore(DB_STORE);
+    store.clear();
+    data.forEach(item => store.put(item));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 // ===== INIT =====
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    db = await openDB();
+    // Migrate from localStorage if data exists there
+    const lsData = localStorage.getItem(STORAGE_KEY);
+    if (lsData) {
+      const lsGames = JSON.parse(lsData);
+      if (lsGames.length > 0) {
+        const existing = await dbLoadAll();
+        if (existing.length === 0) {
+          await dbSaveAll(lsGames);
+          console.log(`Migrated ${lsGames.length} games from localStorage to IndexedDB`);
+        }
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+    games = await dbLoadAll();
+  } catch (err) {
+    console.warn('IndexedDB failed, falling back to localStorage:', err);
+    games = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  }
   renderTabs();
   populateMakers();
   populateGenres();
@@ -369,12 +429,12 @@ function onPhotoSelect(e) {
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const MAX = 800;
+      const MAX = 400;
       let w = img.width, h = img.height;
       if (w > MAX || h > MAX) { const r = Math.min(MAX / w, MAX / h); w *= r; h *= r; }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
       document.getElementById('f-photo-data').value = dataUrl;
       document.getElementById('photo-preview').src = dataUrl;
       document.getElementById('photo-preview').style.display = 'block';
@@ -606,8 +666,15 @@ async function useWikiThumb() {
 
 // ===== UTILS =====
 function persist() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(games)); }
-  catch (e) { alert('保存容量を超えました。写真のサイズを小さくするか、不要なデータを削除してください。'); }
+  if (db) {
+    dbSaveAll(games).catch(e => {
+      console.error('IndexedDB save error:', e);
+      alert('保存に失敗しました: ' + e.message);
+    });
+  } else {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(games)); }
+    catch (e) { alert('保存容量を超えました。写真のサイズを小さくするか、不要なデータを削除してください。'); }
+  }
 }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
