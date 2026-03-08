@@ -297,10 +297,23 @@ function resetForm() {
   ['edit-id','f-title','f-genre','f-year','f-maker','f-memo','f-photo-data'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-platform').value = '';
   document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('photo-preview').src = '';
   document.getElementById('upload-text').style.display = '';
+  document.getElementById('btn-clear-photo').style.display = 'none';
+  document.getElementById('f-photo').value = '';
   document.getElementById('wiki-thumb-area').style.display = 'none';
   document.getElementById('suggest-list').style.display = 'none';
   wikiThumbUrl = '';
+}
+
+function clearPhoto(e) {
+  e.stopPropagation();
+  document.getElementById('f-photo-data').value = '';
+  document.getElementById('photo-preview').style.display = 'none';
+  document.getElementById('photo-preview').src = '';
+  document.getElementById('upload-text').style.display = '';
+  document.getElementById('btn-clear-photo').style.display = 'none';
+  document.getElementById('f-photo').value = '';
 }
 
 function saveGame() {
@@ -323,6 +336,7 @@ function saveGame() {
 }
 
 function editGame(id) {
+  resetForm();
   const g = games.find(x => x.id === id); if (!g) return;
   document.getElementById('edit-id').value = g.id;
   document.getElementById('f-title').value = g.title;
@@ -336,6 +350,7 @@ function editGame(id) {
     document.getElementById('photo-preview').src = g.photo;
     document.getElementById('photo-preview').style.display = 'block';
     document.getElementById('upload-text').style.display = 'none';
+    document.getElementById('btn-clear-photo').style.display = 'block';
   }
   document.getElementById('form-modal').classList.add('active');
 }
@@ -364,6 +379,7 @@ function onPhotoSelect(e) {
       document.getElementById('photo-preview').src = dataUrl;
       document.getElementById('photo-preview').style.display = 'block';
       document.getElementById('upload-text').style.display = 'none';
+      document.getElementById('btn-clear-photo').style.display = 'block';
     };
     img.src = ev.target.result;
   };
@@ -595,3 +611,68 @@ function persist() {
 }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function escAttr(s) { return s.replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+// ===== DATA MANAGEMENT (Export / Import) =====
+function toggleDataMenu(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('data-menu-panel');
+  panel.classList.toggle('active');
+}
+
+// Close menu when clicking outside
+document.addEventListener('click', e => {
+  const panel = document.getElementById('data-menu-panel');
+  if (panel && !e.target.closest('#data-menu-panel') && !e.target.closest('.data-menu-btn')) {
+    panel.classList.remove('active');
+  }
+});
+
+function exportData() {
+  const dataStr = JSON.stringify(games, null, 2);
+  const blob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `retrovault_backup_${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  document.getElementById('data-menu-panel').classList.remove('active');
+  alert(`✅ ${games.length}件のデータをエクスポートしました`);
+}
+
+function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const imported = JSON.parse(ev.target.result);
+      if (!Array.isArray(imported)) { alert('❌ 無効なファイル形式です'); return; }
+      const mode = confirm(
+        `📥 ${imported.length}件のデータが見つかりました。\n\n` +
+        `「OK」→ 既存データに追加（マージ）\n` +
+        `「キャンセル」→ 既存データを置き換え`
+      );
+      if (mode) {
+        // Merge: add only games with IDs not already in the list
+        const existingIds = new Set(games.map(g => g.id));
+        const newGames = imported.filter(g => !existingIds.has(g.id));
+        games = [...games, ...newGames];
+        alert(`✅ ${newGames.length}件の新しいデータを追加しました（重複 ${imported.length - newGames.length}件はスキップ）`);
+      } else {
+        games = imported;
+        alert(`✅ ${imported.length}件のデータで置き換えました`);
+      }
+      persist();
+      renderTabs(); populateMakers(); populateGenres(); renderList(); updateCount();
+    } catch (err) {
+      alert('❌ ファイルの読み込みに失敗しました: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  e.target.value = ''; // reset so same file can be re-selected
+  document.getElementById('data-menu-panel').classList.remove('active');
+}

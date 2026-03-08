@@ -322,6 +322,40 @@ body {
 .upload-area:hover { border-color:var(--accent); background:var(--pink-soft); }
 .upload-area img { max-width:150px; max-height:100px; border-radius:12px; }
 .upload-area input { display:none; }
+.btn-clear-photo {
+  display:none; margin-top:8px; padding:6px 14px; border-radius:20px;
+  border:2px solid var(--danger); background:#fff; color:var(--danger);
+  font-size:11px; font-weight:700; cursor:pointer; font-family:inherit;
+  transition:all .2s;
+}
+.btn-clear-photo:hover { background:var(--danger); color:#fff; }
+
+/* DATA MENU */
+.data-menu-btn {
+  background:rgba(255,255,255,.3); border:none; color:#fff;
+  font-size:20px; cursor:pointer; min-width:36px; min-height:36px;
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  transition:background .2s;
+}
+.data-menu-btn:hover { background:rgba(255,255,255,.5); }
+#data-menu-panel {
+  display:none; position:absolute; right:14px; top:100%; margin-top:8px;
+  background:#fff; border-radius:16px; padding:12px; min-width:200px;
+  box-shadow:0 8px 30px rgba(80,60,120,.2); z-index:110;
+}
+#data-menu-panel.active { display:block; }
+#data-menu-panel button {
+  display:block; width:100%; padding:10px 14px; margin-bottom:6px;
+  border:2px solid #eee; border-radius:12px; background:#fff;
+  color:var(--text); font-size:12px; font-weight:700; cursor:pointer;
+  text-align:left; font-family:inherit; transition:all .2s;
+}
+#data-menu-panel button:last-child { margin-bottom:0; }
+#data-menu-panel button:hover { border-color:var(--accent); background:var(--pink-soft); }
+#data-menu-panel .menu-label {
+  font-size:9px; color:var(--text-dim); margin-bottom:8px; font-weight:700;
+}
+input#import-file { display:none; }
 .loading-spinner { display:inline-block; width:16px; height:16px; border:2px solid #ddd;
   border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; margin-left:8px; }
 @keyframes spin { to{transform:rotate(360deg)} }
@@ -374,13 +408,20 @@ body::before {
 <body>
 <!-- HEADER -->
 <header id="app-header">
-  <div class="header-row">
+  <div class="header-row" style="position:relative">
     <div>
       <h1 class="pixel">🎮 RetroVault</h1>
     </div>
     <div class="header-right">
       <span id="total-count" class="pixel">所有数 <span class="count-number" id="count-number">0</span></span>
       <button class="btn-add pixel" onclick="openForm()">＋ 登録</button>
+      <button class="data-menu-btn" onclick="toggleDataMenu(event)" title="設定">⚙️</button>
+    </div>
+    <div id="data-menu-panel">
+      <div class="menu-label">💾 データ管理</div>
+      <button onclick="exportData()">📤 データをエクスポート（バックアップ）</button>
+      <button onclick="document.getElementById('import-file').click()">📥 データをインポート（復元）</button>
+      <input type="file" id="import-file" accept=".json" onchange="importData(event)">
     </div>
   </div>
 </header>
@@ -455,6 +496,7 @@ body::before {
         <img id="photo-preview" style="display:none">
         <input type="file" id="f-photo" accept="image/jpeg,image/png">
       </div>
+      <button type="button" class="btn-clear-photo" id="btn-clear-photo" onclick="clearPhoto(event)">❌ 写真を削除</button>
       <div class="wiki-thumb-preview" id="wiki-thumb-area" style="display:none">
         <label style="font-size:11px;color:var(--text-dim)">Wikipediaサムネイル（クリックで使用）:</label>
         <img id="wiki-thumb-img" onclick="useWikiThumb()">
