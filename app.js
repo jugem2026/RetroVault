@@ -10,10 +10,13 @@ let games = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
 let wikiThumbUrl = '';
 let suggestTimer = null;
 let activePlatform = ''; // '' = すべて
+let currentSort = 'title'; // 'title' or 'year'
+let sortAsc = true; // true = ascending, false = descending
 
 // ===== INIT =====
 document.addEventListener('DOMContentLoaded', () => {
   renderTabs();
+  populateMakers();
   renderList();
   updateCount();
   // Ownership search
@@ -29,9 +32,52 @@ document.addEventListener('DOMContentLoaded', () => {
   setupSheetSwipe();
 });
 
-// ===== SORTING (50音 / alphabetical) =====
+// ===== SORTING =====
 function sortGames(list) {
-  return [...list].sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+  const sorted = [...list];
+  if (currentSort === 'title') {
+    sorted.sort((a, b) => a.title.localeCompare(b.title, 'ja'));
+  } else if (currentSort === 'year') {
+    sorted.sort((a, b) => {
+      const ya = parseInt(a.year) || 0;
+      const yb = parseInt(b.year) || 0;
+      return ya - yb;
+    });
+  }
+  if (!sortAsc) sorted.reverse();
+  return sorted;
+}
+
+function setSort(type) {
+  if (currentSort === type) {
+    sortAsc = !sortAsc;
+  } else {
+    currentSort = type;
+    sortAsc = true;
+  }
+  updateSortButtons();
+  renderList();
+}
+
+function updateSortButtons() {
+  const titleBtn = document.getElementById('sort-title');
+  const yearBtn = document.getElementById('sort-year');
+  titleBtn.classList.toggle('active', currentSort === 'title');
+  yearBtn.classList.toggle('active', currentSort === 'year');
+  titleBtn.querySelector('.sort-arrow').textContent = currentSort === 'title' ? (sortAsc ? '▲' : '▼') : '▲';
+  yearBtn.querySelector('.sort-arrow').textContent = currentSort === 'year' ? (sortAsc ? '▲' : '▼') : '▲';
+}
+
+// ===== MAKER FILTER =====
+function populateMakers() {
+  const makerSet = new Set(games.map(g => g.maker).filter(Boolean));
+  const sel = document.getElementById('maker-filter');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">すべてのメーカー</option>' +
+    [...makerSet].sort((a, b) => a.localeCompare(b, 'ja')).map(m =>
+      `<option value="${esc(m)}">${esc(m)}</option>`
+    ).join('');
+  sel.value = current;
 }
 
 // ===== PLATFORM TABS =====
@@ -85,9 +131,14 @@ function selectPlatform(platform) {
 
 // ===== GAME LIST (title-only, sorted) =====
 function renderList() {
-  const filtered = activePlatform
+  let filtered = activePlatform
     ? games.filter(g => g.platform === activePlatform)
     : games;
+  // Maker filter
+  const makerVal = document.getElementById('maker-filter').value;
+  if (makerVal) {
+    filtered = filtered.filter(g => g.maker === makerVal);
+  }
   const sorted = sortGames(filtered);
   const container = document.getElementById('game-list');
 
@@ -111,7 +162,7 @@ function renderList() {
 }
 
 function updateCount() {
-  document.getElementById('total-count').textContent = `所有数: ${games.length}`;
+  document.getElementById('count-number').textContent = games.length;
 }
 
 // ===== OWNERSHIP SEARCH =====
@@ -181,7 +232,7 @@ function closeDetail() {
 function deleteGameFromDetail(id) {
   if (!confirm('このゲームを削除しますか？')) return;
   games = games.filter(g => g.id !== id);
-  persist(); closeDetail(); renderTabs(); renderList(); updateCount();
+  persist(); closeDetail(); renderTabs(); populateMakers(); renderList(); updateCount();
 }
 
 // Swipe-down to close
@@ -251,7 +302,7 @@ function saveGame() {
   };
   if (editId) { const idx = games.findIndex(g => g.id === editId); if (idx >= 0) games[idx] = data; }
   else games.unshift(data);
-  persist(); closeForm(); renderTabs(); renderList(); updateCount();
+  persist(); closeForm(); renderTabs(); populateMakers(); renderList(); updateCount();
 }
 
 function editGame(id) {
@@ -275,7 +326,7 @@ function editGame(id) {
 function deleteGame(id) {
   if (!confirm('このゲームを削除しますか？')) return;
   games = games.filter(g => g.id !== id);
-  persist(); renderTabs(); renderList(); updateCount();
+  persist(); renderTabs(); populateMakers(); renderList(); updateCount();
 }
 
 // ===== PHOTO =====
